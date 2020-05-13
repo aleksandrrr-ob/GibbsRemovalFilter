@@ -93,7 +93,7 @@ namespace GibbsRemovalFilterNS
       if (imageData.Length != width * height || width < 0 || height < 0)
         throw new ArgumentException("Wrong width and/or height value (expected: imageData.Length = width * height)");
 
-      image = new ImageWrapper(width, height, MAX_FILTER_WINDOW + 1);
+      image = new ImageWrapper(width, height, MAX_FILTER_WINDOW + 2);
       image.CopyFrom(imageData);
       dx = new ImageWrapper(width, height, 0);
       dy = new ImageWrapper(width, height, 0);
@@ -161,7 +161,7 @@ namespace GibbsRemovalFilterNS
      * @throw ArgumentNullException if outputImage is null.
      * @throw ArgumentException if outputImage has wrong size or parameters are out of expected ranges.
      */
-    public void ProcessImage(float varEstimationWindow, ushort[] outputImage)
+    public void ProcessImage(int varEstimationWindow, ushort[] outputImage)
     {
       if (outputImage == null)
         throw new ArgumentNullException("outputImage");
@@ -177,36 +177,31 @@ namespace GibbsRemovalFilterNS
           float variation = 0, variation_inv = 0;
           float sum = 0, sum_inv = 0;
           int count = 0, px, py;
-          int prev_px = x, prev_py = y;
+
+          float kx = dx[x, y];
+          float ky = dy[x, y];
 
           //calculate variation in 'positive' direction along gradient
-          for (int i = 1; i < varEstimationWindow; i++)
+          for (int i = 1; i <= varEstimationWindow; i++)
           {
-            px = (int)Math.Round(x + dx[x, y] * i);
-            py = (int)Math.Round(y + dy[x, y] * i);
-            if((px != prev_px || py != prev_py))
-            {
-              variation += Math.Abs(image[px, py] - image[prev_px, prev_py]);
-              sum += image[px, py];
-              count++;
-            }
+            px = (int)Math.Round(x + kx * i);
+            py = (int)Math.Round(y + ky * i);
+            variation += Math.Abs(image[px, py] - image[x, y]);
+            sum += image[px, py];
+            count++;
           }
           if (count > 0)
             sum /= count;
 
-          count = 0; prev_px = x; prev_py = y;
-
+          count = 0;
           //calculate variation in 'negative' direction along gradient
-          for (int i = 1; i < varEstimationWindow; i++)
+          for (int i = 1; i <= varEstimationWindow; i++)
           {
-            px = (int)Math.Round(x - dx[x, y] * i);
-            py = (int)Math.Round(y - dy[x, y] * i);
-            if ((px != prev_px || py != prev_py))
-            {
-              variation_inv += Math.Abs(image[px, py] - image[prev_px, prev_py]);
-              sum_inv += image[px, py];
-              count++;
-            }
+            px = (int)Math.Round(x - kx * i);
+            py = (int)Math.Round(y - ky * i);
+            variation_inv += Math.Abs(image[px, py] - image[x, y]);
+            sum_inv += image[px, py];
+            count++;
           }
           if (count > 0)
             sum_inv /= count;
