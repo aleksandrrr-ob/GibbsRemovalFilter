@@ -124,6 +124,7 @@ namespace GibbsRemovalFilterNS
       });
     }
 
+    //2d image convolution with 5x5 kernel
     private void Conv2(float[] vcol, float[] vrow, ImageWrapper res)
     {
       ImageWrapper temp_frame = new ImageWrapper(res.Width, res.Height, 2);
@@ -153,6 +154,29 @@ namespace GibbsRemovalFilterNS
       });
     }
 
+    //Gets estimated value for given pixel, direction and window size
+    private float GetFilteredValue(int x, int y, int window, float kx, float ky)
+    {
+      int count = 0;
+      float value = 0;
+      int px, py;
+      int px_prev = x, py_prev = y;
+
+      for (int i = 1; i <= window; i++)
+      {
+        px = (int)Math.Round(x + kx * i);
+        py = (int)Math.Round(y + ky * i);
+        if (px != px_prev || py != py_prev)
+        {
+          value += image[px, py];
+          count++;
+          px_prev = px; py_prev = py;
+        }
+      }
+
+      return count == 0 ? image[x, y] : value / count;
+    }
+
     /**
      * Makes processed image and writes it to output array.
      * Note: Gaussian blur needed after processing. 
@@ -174,45 +198,13 @@ namespace GibbsRemovalFilterNS
       {
         for (int x = 0; x < image.Width; x++)
         {
-          float variation = 0, variation_inv = 0;
-          float sum = 0, sum_inv = 0;
-          int count = 0, px, py;
-
           float kx = dx[x, y];
           float ky = dy[x, y];
 
-          //calculate variation in 'positive' direction along gradient
-          for (int i = 1; i <= varEstimationWindow; i++)
-          {
-            px = (int)Math.Round(x + kx * i);
-            py = (int)Math.Round(y + ky * i);
-            variation += Math.Abs(image[px, py] - image[x, y]);
-            sum += image[px, py];
-            count++;
-          }
-          if (count > 0)
-            sum /= count;
+          float value1 = GetFilteredValue(x, y, varEstimationWindow, kx, ky);
+          float value2 = GetFilteredValue(x, y, varEstimationWindow, -kx, -ky);
 
-          count = 0;
-          //calculate variation in 'negative' direction along gradient
-          for (int i = 1; i <= varEstimationWindow; i++)
-          {
-            px = (int)Math.Round(x - kx * i);
-            py = (int)Math.Round(y - ky * i);
-            variation_inv += Math.Abs(image[px, py] - image[x, y]);
-            sum_inv += image[px, py];
-            count++;
-          }
-          if (count > 0)
-            sum_inv /= count;
-
-          //set average value from 'min variation direction' for current pixel
-          if (variation == 0 && variation_inv == 0)
-            outputImage[x + image.Width * y] = (ushort)Math.Clamp(Math.Round(image[x, y]), 0.0f, 65535.0f);
-          else if (variation < variation_inv)
-            outputImage[x + image.Width * y] = (ushort)Math.Clamp(Math.Round(sum), 0.0f, 65535.0f);
-          else
-            outputImage[x + image.Width * y] = (ushort)Math.Clamp(Math.Round(sum_inv), 0.0f, 65535.0f);
+          outputImage[x + image.Width * y] = (ushort)Math.Clamp(Math.Round(Math.Abs(value1 - image[x, y]) < Math.Abs(value2 - image[x, y]) ? value1 : value2), 0.0f, 65535.0f);
         }
       });
     }
